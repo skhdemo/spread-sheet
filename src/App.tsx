@@ -8,6 +8,9 @@ import {
   Trash2,
   Download,
   Upload,
+  Edit3,
+  Save,
+  X,
 } from "lucide-react";
 
 function App() {
@@ -32,6 +35,20 @@ function App() {
   const [newActivityParticipants, setNewActivityParticipants] = useState<
     { familyId: string; count: number }[]
   >([]);
+
+  // Edit state
+  const [editingFamilyId, setEditingFamilyId] = useState<string | null>(null);
+  const [editingFamilyName, setEditingFamilyName] = useState("");
+  const [editingFamilyMemberCount, setEditingFamilyMemberCount] = useState("");
+
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(
+    null
+  );
+  const [editingActivityName, setEditingActivityName] = useState("");
+  const [editingActivityCost, setEditingActivityCost] = useState("");
+  const [editingActivityPaidBy, setEditingActivityPaidBy] = useState("");
+  const [editingActivityParticipants, setEditingActivityParticipants] =
+    useState<{ familyId: string; count: number }[]>([]);
 
   // Save to localStorage on change
   useEffect(() => {
@@ -203,6 +220,136 @@ function App() {
     setActivities(activities.filter((a) => a.id !== activityId));
   };
 
+  // Edit family functions
+  const startEditFamily = (family: Family) => {
+    setEditingFamilyId(family.id);
+    setEditingFamilyName(family.name);
+    setEditingFamilyMemberCount(family.memberCount.toString());
+  };
+
+  const cancelEditFamily = () => {
+    setEditingFamilyId(null);
+    setEditingFamilyName("");
+    setEditingFamilyMemberCount("");
+  };
+
+  const saveEditFamily = () => {
+    if (
+      !editingFamilyName.trim() ||
+      !editingFamilyMemberCount ||
+      parseInt(editingFamilyMemberCount) <= 0
+    ) {
+      return;
+    }
+
+    const newMemberCount = parseInt(editingFamilyMemberCount);
+
+    // Update the family
+    setFamilies(
+      families.map((family) =>
+        family.id === editingFamilyId
+          ? {
+              ...family,
+              name: editingFamilyName.trim(),
+              memberCount: newMemberCount,
+            }
+          : family
+      )
+    );
+
+    // Update activities to ensure participant counts don't exceed new family size
+    setActivities(
+      activities.map((activity) => ({
+        ...activity,
+        participants: activity.participants.map((participant) =>
+          participant.familyId === editingFamilyId
+            ? {
+                ...participant,
+                count: Math.min(participant.count, newMemberCount),
+              }
+            : participant
+        ),
+      }))
+    );
+
+    cancelEditFamily();
+  };
+
+  // Edit activity functions
+  const startEditActivity = (activity: Activity) => {
+    setEditingActivityId(activity.id);
+    setEditingActivityName(activity.name);
+    setEditingActivityCost(activity.cost.toString());
+    setEditingActivityPaidBy(activity.paidBy);
+    setEditingActivityParticipants([...activity.participants]);
+  };
+
+  const cancelEditActivity = () => {
+    setEditingActivityId(null);
+    setEditingActivityName("");
+    setEditingActivityCost("");
+    setEditingActivityPaidBy("");
+    setEditingActivityParticipants([]);
+  };
+
+  const saveEditActivity = () => {
+    if (
+      !editingActivityName.trim() ||
+      !editingActivityCost ||
+      !editingActivityPaidBy ||
+      editingActivityParticipants.length === 0
+    ) {
+      return;
+    }
+
+    const filteredParticipants = editingActivityParticipants.filter(
+      (p) => p.count > 0
+    );
+    const totalParticipants = filteredParticipants.reduce(
+      (sum, p) => sum + p.count,
+      0
+    );
+    if (filteredParticipants.length === 0 || totalParticipants === 0) return;
+
+    setActivities(
+      activities.map((activity) =>
+        activity.id === editingActivityId
+          ? {
+              ...activity,
+              name: editingActivityName.trim(),
+              cost: parseFloat(editingActivityCost),
+              paidBy: editingActivityPaidBy,
+              participants: filteredParticipants,
+            }
+          : activity
+      )
+    );
+
+    cancelEditActivity();
+  };
+
+  // Handle per-family participant count change in edit activity form
+  const handleEditParticipantCountChange = (
+    familyId: string,
+    value: string
+  ) => {
+    const count = Math.max(
+      0,
+      Math.min(
+        Number(value),
+        families.find((f) => f.id === familyId)?.memberCount || 0
+      )
+    );
+    setEditingActivityParticipants((prev) => {
+      const existing = prev.find((p) => p.familyId === familyId);
+      if (existing) {
+        return prev.map((p) => (p.familyId === familyId ? { ...p, count } : p));
+      } else {
+        return [...prev, { familyId, count }];
+      }
+    });
+  };
+
   // Calculate expense results
   const calculateResults = () => {
     const results: ExpenseResult[] = families.map((family) => {
@@ -328,21 +475,80 @@ function App() {
 
           {families.map((family) => (
             <div key={family.id} className="family-card">
-              <div className="family-header">
-                <div className="family-name">{family.name}</div>
-                <button
-                  className="btn btn-danger btn-small"
-                  onClick={() => removeFamily(family.id)}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-              <div className="members-list">
-                <span className="member-tag">
-                  {family.memberCount} member
-                  {family.memberCount !== 1 ? "s" : ""}
-                </span>
-              </div>
+              {editingFamilyId === family.id ? (
+                // Edit mode
+                <div>
+                  <div className="form-group">
+                    <label>Family Name:</label>
+                    <input
+                      type="text"
+                      value={editingFamilyName}
+                      onChange={(e) => setEditingFamilyName(e.target.value)}
+                      placeholder="e.g., Smith Family"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Number of Members:</label>
+                    <input
+                      type="number"
+                      value={editingFamilyMemberCount}
+                      onChange={(e) =>
+                        setEditingFamilyMemberCount(e.target.value)
+                      }
+                      placeholder="e.g., 3"
+                      min="1"
+                      max="20"
+                    />
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "0.5rem",
+                      marginTop: "0.5rem",
+                    }}
+                  >
+                    <button
+                      className="btn btn-primary btn-small"
+                      onClick={saveEditFamily}
+                    >
+                      <Save size={14} /> Save
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-small"
+                      onClick={cancelEditFamily}
+                    >
+                      <X size={14} /> Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // View mode
+                <>
+                  <div className="family-header">
+                    <div className="family-name">{family.name}</div>
+                    <div style={{ display: "flex", gap: "0.25rem" }}>
+                      <button
+                        className="btn btn-secondary btn-small"
+                        onClick={() => startEditFamily(family)}
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      <button
+                        className="btn btn-danger btn-small"
+                        onClick={() => removeFamily(family.id)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="members-list">
+                    <span className="member-tag">
+                      {family.memberCount} member
+                      {family.memberCount !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           ))}
 
@@ -458,45 +664,171 @@ function App() {
             );
             return (
               <div key={activity.id} className="activity-card">
-                <div className="activity-header">
-                  <div className="activity-name">{activity.name}</div>
-                  <div className="activity-cost">
-                    ${activity.cost.toFixed(2)}
+                {editingActivityId === activity.id ? (
+                  // Edit mode
+                  <div>
+                    <div className="form-group">
+                      <label>Activity Name:</label>
+                      <input
+                        type="text"
+                        value={editingActivityName}
+                        onChange={(e) => setEditingActivityName(e.target.value)}
+                        placeholder="e.g., Dinner at Restaurant"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Cost ($):</label>
+                      <input
+                        type="number"
+                        value={editingActivityCost}
+                        onChange={(e) => setEditingActivityCost(e.target.value)}
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Paid By:</label>
+                      <select
+                        value={editingActivityPaidBy}
+                        onChange={(e) =>
+                          setEditingActivityPaidBy(e.target.value)
+                        }
+                      >
+                        <option value="">Select a family</option>
+                        {families.map((family) => (
+                          <option key={family.id} value={family.id}>
+                            {family.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Number of Participants Per Family:</label>
+                      {families.length === 0 && (
+                        <div style={{ color: "#718096", fontSize: "0.95rem" }}>
+                          Add families first.
+                        </div>
+                      )}
+                      {families.map((family) => {
+                        const value =
+                          editingActivityParticipants.find(
+                            (p) => p.familyId === family.id
+                          )?.count || "";
+                        return (
+                          <div
+                            key={family.id}
+                            style={{
+                              marginBottom: "0.5rem",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.5rem",
+                            }}
+                          >
+                            <label style={{ minWidth: 120 }}>
+                              {family.name}:
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={family.memberCount}
+                              value={value}
+                              onChange={(e) =>
+                                handleEditParticipantCountChange(
+                                  family.id,
+                                  e.target.value
+                                )
+                              }
+                              placeholder={`0 - ${family.memberCount}`}
+                              style={{ width: 80 }}
+                            />
+                            <span
+                              style={{ color: "#718096", fontSize: "0.95rem" }}
+                            >
+                              (max {family.memberCount})
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "0.5rem",
+                        marginTop: "0.5rem",
+                      }}
+                    >
+                      <button
+                        className="btn btn-primary btn-small"
+                        onClick={saveEditActivity}
+                      >
+                        <Save size={14} /> Save
+                      </button>
+                      <button
+                        className="btn btn-secondary btn-small"
+                        onClick={cancelEditActivity}
+                      >
+                        <X size={14} /> Cancel
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="paid-by">
-                  Paid by:{" "}
-                  {families.find((f) => f.id === activity.paidBy)?.name}
-                </div>
-                <div className="participants">
-                  {activity.participants.map((p) => {
-                    const fam = families.find((f) => f.id === p.familyId);
-                    if (!fam || p.count === 0) return null;
-                    return (
-                      <span key={p.familyId} className="participant">
-                        {fam.name}: {p.count}
+                ) : (
+                  // View mode
+                  <>
+                    <div className="activity-header">
+                      <div className="activity-name">{activity.name}</div>
+                      <div className="activity-cost">
+                        ${activity.cost.toFixed(2)}
+                      </div>
+                    </div>
+                    <div className="paid-by">
+                      Paid by:{" "}
+                      {families.find((f) => f.id === activity.paidBy)?.name}
+                    </div>
+                    <div className="participants">
+                      {activity.participants.map((p) => {
+                        const fam = families.find((f) => f.id === p.familyId);
+                        if (!fam || p.count === 0) return null;
+                        return (
+                          <span key={p.familyId} className="participant">
+                            {fam.name}: {p.count}
+                          </span>
+                        );
+                      })}
+                      <span
+                        className="participant"
+                        style={{
+                          background: "#c6f6d5",
+                          color: "#22543d",
+                          marginLeft: 8,
+                        }}
+                      >
+                        Total: {totalParticipants}
                       </span>
-                    );
-                  })}
-                  <span
-                    className="participant"
-                    style={{
-                      background: "#c6f6d5",
-                      color: "#22543d",
-                      marginLeft: 8,
-                    }}
-                  >
-                    Total: {totalParticipants}
-                  </span>
-                </div>
-                <button
-                  className="btn btn-danger btn-small"
-                  onClick={() => removeActivity(activity.id)}
-                  style={{ marginTop: "0.5rem" }}
-                >
-                  <Trash2 size={14} />
-                  Remove
-                </button>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "0.25rem",
+                        marginTop: "0.5rem",
+                      }}
+                    >
+                      <button
+                        className="btn btn-secondary btn-small"
+                        onClick={() => startEditActivity(activity)}
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      <button
+                        className="btn btn-danger btn-small"
+                        onClick={() => removeActivity(activity.id)}
+                      >
+                        <Trash2 size={14} />
+                        Remove
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             );
           })}
