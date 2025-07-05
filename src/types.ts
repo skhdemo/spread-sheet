@@ -10,6 +10,7 @@ export interface Activity {
   cost: number;
   paidBy: string; // Family ID
   participants: { familyId: string; count: number }[]; // Per-family participation
+  date: string; // Date of the activity (YYYY-MM-DD format)
 }
 
 export interface ExpenseResult {

@@ -32,6 +32,7 @@ function App() {
   const [newActivityName, setNewActivityName] = useState("");
   const [newActivityCost, setNewActivityCost] = useState("");
   const [newActivityPaidBy, setNewActivityPaidBy] = useState("");
+  const [newActivityDate, setNewActivityDate] = useState("");
   const [newActivityParticipants, setNewActivityParticipants] = useState<
     { familyId: string; count: number }[]
   >([]);
@@ -47,6 +48,7 @@ function App() {
   const [editingActivityName, setEditingActivityName] = useState("");
   const [editingActivityCost, setEditingActivityCost] = useState("");
   const [editingActivityPaidBy, setEditingActivityPaidBy] = useState("");
+  const [editingActivityDate, setEditingActivityDate] = useState("");
   const [editingActivityParticipants, setEditingActivityParticipants] =
     useState<{ familyId: string; count: number }[]>([]);
 
@@ -187,6 +189,7 @@ function App() {
       !newActivityName.trim() ||
       !newActivityCost ||
       !newActivityPaidBy ||
+      !newActivityDate ||
       newActivityParticipants.length === 0
     )
       return;
@@ -205,6 +208,7 @@ function App() {
       name: newActivityName.trim(),
       cost: parseFloat(newActivityCost),
       paidBy: newActivityPaidBy,
+      date: newActivityDate,
       participants: filteredParticipants,
     };
 
@@ -212,6 +216,7 @@ function App() {
     setNewActivityName("");
     setNewActivityCost("");
     setNewActivityPaidBy("");
+    setNewActivityDate("");
     setNewActivityParticipants([]);
   };
 
@@ -281,6 +286,7 @@ function App() {
     setEditingActivityName(activity.name);
     setEditingActivityCost(activity.cost.toString());
     setEditingActivityPaidBy(activity.paidBy);
+    setEditingActivityDate(activity.date);
     setEditingActivityParticipants([...activity.participants]);
   };
 
@@ -289,6 +295,7 @@ function App() {
     setEditingActivityName("");
     setEditingActivityCost("");
     setEditingActivityPaidBy("");
+    setEditingActivityDate("");
     setEditingActivityParticipants([]);
   };
 
@@ -297,6 +304,7 @@ function App() {
       !editingActivityName.trim() ||
       !editingActivityCost ||
       !editingActivityPaidBy ||
+      !editingActivityDate ||
       editingActivityParticipants.length === 0
     ) {
       return;
@@ -319,6 +327,7 @@ function App() {
               name: editingActivityName.trim(),
               cost: parseFloat(editingActivityCost),
               paidBy: editingActivityPaidBy,
+              date: editingActivityDate,
               participants: filteredParticipants,
             }
           : activity
@@ -612,6 +621,16 @@ function App() {
           </div>
 
           <div className="form-group">
+            <label>Date:</label>
+            <input
+              type="date"
+              value={newActivityDate}
+              onChange={(e) => setNewActivityDate(e.target.value)}
+              placeholder="Select date"
+            />
+          </div>
+
+          <div className="form-group">
             <label>Number of Participants Per Family:</label>
             {families.length === 0 && (
               <div style={{ color: "#718096", fontSize: "0.95rem" }}>
@@ -703,6 +722,16 @@ function App() {
                         ))}
                       </select>
                     </div>
+
+                    <div className="form-group">
+                      <label>Date:</label>
+                      <input
+                        type="date"
+                        value={editingActivityDate}
+                        onChange={(e) => setEditingActivityDate(e.target.value)}
+                        placeholder="Select date"
+                      />
+                    </div>
                     <div className="form-group">
                       <label>Number of Participants Per Family:</label>
                       {families.length === 0 && (
@@ -784,6 +813,16 @@ function App() {
                     <div className="paid-by">
                       Paid by:{" "}
                       {families.find((f) => f.id === activity.paidBy)?.name}
+                    </div>
+                    <div
+                      className="activity-date"
+                      style={{
+                        fontSize: "0.875rem",
+                        color: "#718096",
+                        marginBottom: "0.5rem",
+                      }}
+                    >
+                      Date: {new Date(activity.date).toLocaleDateString()}
                     </div>
                     <div className="participants">
                       {activity.participants.map((p) => {
