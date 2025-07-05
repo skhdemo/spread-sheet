@@ -26,7 +26,6 @@ function App() {
 
   // Family form state
   const [newFamilyName, setNewFamilyName] = useState("");
-  const [newFamilyMemberCount, setNewFamilyMemberCount] = useState("");
 
   // Activity form state
   const [newActivityName, setNewActivityName] = useState("");
@@ -40,7 +39,6 @@ function App() {
   // Edit state
   const [editingFamilyId, setEditingFamilyId] = useState<string | null>(null);
   const [editingFamilyName, setEditingFamilyName] = useState("");
-  const [editingFamilyMemberCount, setEditingFamilyMemberCount] = useState("");
 
   const [editingActivityId, setEditingActivityId] = useState<string | null>(
     null
@@ -137,22 +135,15 @@ function App() {
 
   // Add a new family
   const addFamily = () => {
-    if (
-      !newFamilyName.trim() ||
-      !newFamilyMemberCount ||
-      parseInt(newFamilyMemberCount) <= 0
-    )
-      return;
+    if (!newFamilyName.trim()) return;
 
     const newFamily: Family = {
       id: Date.now().toString(),
       name: newFamilyName.trim(),
-      memberCount: parseInt(newFamilyMemberCount),
     };
 
     setFamilies([...families, newFamily]);
     setNewFamilyName("");
-    setNewFamilyMemberCount("");
   };
 
   // Remove a family
@@ -166,13 +157,7 @@ function App() {
 
   // Handle per-family participant count change in activity form
   const handleParticipantCountChange = (familyId: string, value: string) => {
-    const count = Math.max(
-      0,
-      Math.min(
-        Number(value),
-        families.find((f) => f.id === familyId)?.memberCount || 0
-      )
-    );
+    const count = Math.max(0, Number(value));
     setNewActivityParticipants((prev) => {
       const existing = prev.find((p) => p.familyId === familyId);
       if (existing) {
@@ -229,25 +214,17 @@ function App() {
   const startEditFamily = (family: Family) => {
     setEditingFamilyId(family.id);
     setEditingFamilyName(family.name);
-    setEditingFamilyMemberCount(family.memberCount.toString());
   };
 
   const cancelEditFamily = () => {
     setEditingFamilyId(null);
     setEditingFamilyName("");
-    setEditingFamilyMemberCount("");
   };
 
   const saveEditFamily = () => {
-    if (
-      !editingFamilyName.trim() ||
-      !editingFamilyMemberCount ||
-      parseInt(editingFamilyMemberCount) <= 0
-    ) {
+    if (!editingFamilyName.trim()) {
       return;
     }
-
-    const newMemberCount = parseInt(editingFamilyMemberCount);
 
     // Update the family
     setFamilies(
@@ -256,25 +233,9 @@ function App() {
           ? {
               ...family,
               name: editingFamilyName.trim(),
-              memberCount: newMemberCount,
             }
           : family
       )
-    );
-
-    // Update activities to ensure participant counts don't exceed new family size
-    setActivities(
-      activities.map((activity) => ({
-        ...activity,
-        participants: activity.participants.map((participant) =>
-          participant.familyId === editingFamilyId
-            ? {
-                ...participant,
-                count: Math.min(participant.count, newMemberCount),
-              }
-            : participant
-        ),
-      }))
     );
 
     cancelEditFamily();
@@ -342,13 +303,7 @@ function App() {
     familyId: string,
     value: string
   ) => {
-    const count = Math.max(
-      0,
-      Math.min(
-        Number(value),
-        families.find((f) => f.id === familyId)?.memberCount || 0
-      )
-    );
+    const count = Math.max(0, Number(value));
     setEditingActivityParticipants((prev) => {
       const existing = prev.find((p) => p.familyId === familyId);
       if (existing) {
@@ -408,9 +363,9 @@ function App() {
     }
   }, [families, activities]);
 
-  // Get total members across all families
-  const getTotalMembers = () => {
-    return families.reduce((sum, family) => sum + family.memberCount, 0);
+  // Get total families
+  const getTotalFamilies = () => {
+    return families.length;
   };
 
   return (
@@ -465,18 +420,6 @@ function App() {
             />
           </div>
 
-          <div className="form-group">
-            <label>Number of Members:</label>
-            <input
-              type="number"
-              value={newFamilyMemberCount}
-              onChange={(e) => setNewFamilyMemberCount(e.target.value)}
-              placeholder="e.g., 3"
-              min="1"
-              max="20"
-            />
-          </div>
-
           <button className="btn btn-primary" onClick={addFamily}>
             <Plus size={16} />
             Add Family
@@ -494,19 +437,6 @@ function App() {
                       value={editingFamilyName}
                       onChange={(e) => setEditingFamilyName(e.target.value)}
                       placeholder="e.g., Smith Family"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Number of Members:</label>
-                    <input
-                      type="number"
-                      value={editingFamilyMemberCount}
-                      onChange={(e) =>
-                        setEditingFamilyMemberCount(e.target.value)
-                      }
-                      placeholder="e.g., 3"
-                      min="1"
-                      max="20"
                     />
                   </div>
                   <div
@@ -551,10 +481,7 @@ function App() {
                     </div>
                   </div>
                   <div className="members-list">
-                    <span className="member-tag">
-                      {family.memberCount} member
-                      {family.memberCount !== 1 ? "s" : ""}
-                    </span>
+                    <span className="member-tag">Family</span>
                   </div>
                 </>
               )}
@@ -571,7 +498,7 @@ function App() {
                 textAlign: "center",
               }}
             >
-              <strong>Total Members: {getTotalMembers()}</strong>
+              <strong>Total Families: {getTotalFamilies()}</strong>
             </div>
           )}
         </div>
@@ -655,17 +582,13 @@ function App() {
                   <input
                     type="number"
                     min={0}
-                    max={family.memberCount}
                     value={value}
                     onChange={(e) =>
                       handleParticipantCountChange(family.id, e.target.value)
                     }
-                    placeholder={`0 - ${family.memberCount}`}
+                    placeholder="0"
                     style={{ width: 80 }}
                   />
-                  <span style={{ color: "#718096", fontSize: "0.95rem" }}>
-                    (max {family.memberCount})
-                  </span>
                 </div>
               );
             })}
@@ -760,7 +683,6 @@ function App() {
                             <input
                               type="number"
                               min={0}
-                              max={family.memberCount}
                               value={value}
                               onChange={(e) =>
                                 handleEditParticipantCountChange(
@@ -768,14 +690,9 @@ function App() {
                                   e.target.value
                                 )
                               }
-                              placeholder={`0 - ${family.memberCount}`}
+                              placeholder="0"
                               style={{ width: 80 }}
                             />
-                            <span
-                              style={{ color: "#718096", fontSize: "0.95rem" }}
-                            >
-                              (max {family.memberCount})
-                            </span>
                           </div>
                         );
                       })}

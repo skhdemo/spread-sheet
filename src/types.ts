@@ -1,7 +1,6 @@
 export interface Family {
   id: string;
   name: string;
-  memberCount: number; // Number of members instead of individual names
 }
 
 export interface Activity {
