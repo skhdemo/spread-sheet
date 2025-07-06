@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Family, Activity, ExpenseResult } from "./types";
+import { exportToCSV, importFromCSV } from "./csvUtils";
 import {
   Users,
   Plus,
@@ -30,6 +31,9 @@ function App() {
   // Activity form state
   const [newActivityName, setNewActivityName] = useState("");
   const [newActivityCost, setNewActivityCost] = useState("");
+  const [newActivityCurrency, setNewActivityCurrency] = useState<"USD" | "CAD">(
+    "CAD"
+  );
   const [newActivityPaidBy, setNewActivityPaidBy] = useState("");
   const [newActivityDate, setNewActivityDate] = useState("");
   const [newActivityParticipants, setNewActivityParticipants] = useState<
@@ -46,6 +50,9 @@ function App() {
   const [editingActivityName, setEditingActivityName] = useState("");
   const [editingActivityCost, setEditingActivityCost] = useState("");
   const [editingActivityPaidBy, setEditingActivityPaidBy] = useState("");
+  const [editingActivityCurrency, setEditingActivityCurrency] = useState<
+    "USD" | "CAD"
+  >("CAD");
   const [editingActivityDate, setEditingActivityDate] = useState("");
   const [editingActivityParticipants, setEditingActivityParticipants] =
     useState<{ familyId: string; count: number }[]>([]);
@@ -80,6 +87,14 @@ function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportToCSV = () => {
+    if (families.length === 0 || activities.length === 0) {
+      alert("No data to export. Add families and activities first.");
+      return;
+    }
+    exportToCSV(families, activities);
   };
 
   // Import data
@@ -119,6 +134,32 @@ function App() {
     reader.readAsText(file);
 
     // Reset the input so the same file can be selected again
+    event.target.value = "";
+  };
+
+  const handleImportFromCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const result = importFromCSV(content, families);
+
+        if (
+          window.confirm("This will replace all current data. Are you sure?")
+        ) {
+          setFamilies(result.families);
+          setActivities(result.activities);
+          alert("CSV data imported successfully!");
+        }
+      } catch (error) {
+        console.error("CSV import error:", error);
+        alert("Error reading CSV file. Please check the file format.");
+      }
+    };
+    reader.readAsText(file);
     event.target.value = "";
   };
 
@@ -192,6 +233,7 @@ function App() {
       id: Date.now().toString(),
       name: newActivityName.trim(),
       cost: parseFloat(newActivityCost),
+      currency: newActivityCurrency,
       paidBy: newActivityPaidBy,
       date: newActivityDate,
       participants: filteredParticipants,
@@ -200,6 +242,7 @@ function App() {
     setActivities([...activities, newActivity]);
     setNewActivityName("");
     setNewActivityCost("");
+    setNewActivityCurrency("CAD");
     setNewActivityPaidBy("");
     setNewActivityDate("");
     setNewActivityParticipants([]);
@@ -246,6 +289,7 @@ function App() {
     setEditingActivityId(activity.id);
     setEditingActivityName(activity.name);
     setEditingActivityCost(activity.cost.toString());
+    setEditingActivityCurrency(activity.currency);
     setEditingActivityPaidBy(activity.paidBy);
     setEditingActivityDate(activity.date);
     setEditingActivityParticipants([...activity.participants]);
@@ -255,6 +299,7 @@ function App() {
     setEditingActivityId(null);
     setEditingActivityName("");
     setEditingActivityCost("");
+    setEditingActivityCurrency("CAD");
     setEditingActivityPaidBy("");
     setEditingActivityDate("");
     setEditingActivityParticipants([]);
@@ -287,6 +332,7 @@ function App() {
               ...activity,
               name: editingActivityName.trim(),
               cost: parseFloat(editingActivityCost),
+              currency: editingActivityCurrency,
               paidBy: editingActivityPaidBy,
               date: editingActivityDate,
               participants: filteredParticipants,
@@ -314,20 +360,31 @@ function App() {
     });
   };
 
+  // USD to CAD conversion rate (you can update this as needed)
+  const USD_TO_CAD_RATE = 1.35;
+
+  // Convert amount to CAD
+  const convertToCAD = (amount: number, currency: "USD" | "CAD") => {
+    if (currency === "USD") {
+      return amount * USD_TO_CAD_RATE;
+    }
+    return amount; // Already in CAD
+  };
+
   // Calculate expense results
   const calculateResults = () => {
     const results: ExpenseResult[] = families.map((family) => {
       let totalPaid = 0;
       let totalOwed = 0;
 
-      // Calculate what this family paid
+      // Calculate what this family paid (converted to CAD)
       activities.forEach((activity) => {
         if (activity.paidBy === family.id) {
-          totalPaid += activity.cost;
+          totalPaid += convertToCAD(activity.cost, activity.currency);
         }
       });
 
-      // Calculate what this family owes
+      // Calculate what this family owes (converted to CAD)
       activities.forEach((activity) => {
         const famPart = activity.participants.find(
           (p) => p.familyId === family.id
@@ -337,7 +394,8 @@ function App() {
           0
         );
         if (famPart && famPart.count > 0 && totalParticipants > 0) {
-          const costPerParticipant = activity.cost / totalParticipants;
+          const costPerParticipant =
+            convertToCAD(activity.cost, activity.currency) / totalParticipants;
           totalOwed += costPerParticipant * famPart.count;
         }
       });
@@ -379,20 +437,39 @@ function App() {
             gap: "0.5rem",
             justifyContent: "center",
             marginTop: "1rem",
+            flexWrap: "wrap",
           }}
         >
           <button className="btn btn-secondary btn-small" onClick={exportData}>
-            <Download size={14} /> Export Data
+            <Download size={14} /> Export JSON
+          </button>
+          <button
+            className="btn btn-secondary btn-small"
+            onClick={handleExportToCSV}
+          >
+            <Download size={14} /> Export CSV
           </button>
           <label
             className="btn btn-secondary btn-small"
             style={{ cursor: "pointer", margin: 0 }}
           >
-            <Upload size={14} /> Import Data
+            <Upload size={14} /> Import JSON
             <input
               type="file"
               accept=".json"
               onChange={importData}
+              style={{ display: "none" }}
+            />
+          </label>
+          <label
+            className="btn btn-secondary btn-small"
+            style={{ cursor: "pointer", margin: 0 }}
+          >
+            <Upload size={14} /> Import CSV
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleImportFromCSV}
               style={{ display: "none" }}
             />
           </label>
@@ -521,15 +598,30 @@ function App() {
           </div>
 
           <div className="form-group">
-            <label>Cost ($):</label>
-            <input
-              type="number"
-              value={newActivityCost}
-              onChange={(e) => setNewActivityCost(e.target.value)}
-              placeholder="0.00"
-              step="0.01"
-              min="0"
-            />
+            <label>Cost:</label>
+            <div
+              style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}
+            >
+              <input
+                type="number"
+                value={newActivityCost}
+                onChange={(e) => setNewActivityCost(e.target.value)}
+                placeholder="0.00"
+                step="0.01"
+                min="0"
+                style={{ flex: 1 }}
+              />
+              <select
+                value={newActivityCurrency}
+                onChange={(e) =>
+                  setNewActivityCurrency(e.target.value as "USD" | "CAD")
+                }
+                style={{ width: "auto" }}
+              >
+                <option value="CAD">CAD</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
           </div>
 
           <div className="form-group">
@@ -619,15 +711,38 @@ function App() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Cost ($):</label>
-                      <input
-                        type="number"
-                        value={editingActivityCost}
-                        onChange={(e) => setEditingActivityCost(e.target.value)}
-                        placeholder="0.00"
-                        step="0.01"
-                        min="0"
-                      />
+                      <label>Cost:</label>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "0.5rem",
+                          alignItems: "center",
+                        }}
+                      >
+                        <input
+                          type="number"
+                          value={editingActivityCost}
+                          onChange={(e) =>
+                            setEditingActivityCost(e.target.value)
+                          }
+                          placeholder="0.00"
+                          step="0.01"
+                          min="0"
+                          style={{ flex: 1 }}
+                        />
+                        <select
+                          value={editingActivityCurrency}
+                          onChange={(e) =>
+                            setEditingActivityCurrency(
+                              e.target.value as "USD" | "CAD"
+                            )
+                          }
+                          style={{ width: "auto" }}
+                        >
+                          <option value="CAD">CAD</option>
+                          <option value="USD">USD</option>
+                        </select>
+                      </div>
                     </div>
                     <div className="form-group">
                       <label>Paid By:</label>
@@ -724,7 +839,8 @@ function App() {
                     <div className="activity-header">
                       <div className="activity-name">{activity.name}</div>
                       <div className="activity-cost">
-                        ${activity.cost.toFixed(2)}
+                        {activity.currency === "USD" ? "$" : "C$"}
+                        {activity.cost.toFixed(2)}
                       </div>
                     </div>
                     <div className="paid-by">
@@ -796,8 +912,17 @@ function App() {
         <div className="section results-section">
           <h2>
             <Calculator size={24} />
-            Expense Summary
+            Expense Summary (All amounts in CAD)
           </h2>
+          <div
+            style={{
+              fontSize: "0.875rem",
+              color: "#718096",
+              marginBottom: "1rem",
+            }}
+          >
+            USD amounts are converted to CAD at 1 USD = 1.35 CAD
+          </div>
 
           <div className="results-grid">
             {results.map((result) => (
@@ -812,11 +937,11 @@ function App() {
                       : "result-neutral"
                   }`}
                 >
-                  {result.netAmount > 0 ? "+" : ""}$
+                  {result.netAmount > 0 ? "+" : ""}C$
                   {result.netAmount.toFixed(2)}
                 </div>
                 <div style={{ fontSize: "0.875rem", color: "#718096" }}>
-                  Paid: ${result.totalPaid.toFixed(2)} | Owed: $
+                  Paid: C${result.totalPaid.toFixed(2)} | Owed: C$
                   {result.totalOwed.toFixed(2)}
                 </div>
                 {result.netAmount > 0 && (

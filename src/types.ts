@@ -7,6 +7,7 @@ export interface Activity {
   id: string;
   name: string;
   cost: number;
+  currency: "USD" | "CAD"; // Currency of the cost
   paidBy: string; // Family ID
   participants: { familyId: string; count: number }[]; // Per-family participation
   date: string; // Date of the activity (YYYY-MM-DD format)
