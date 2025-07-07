@@ -145,7 +145,7 @@ function App() {
     reader.onload = (e) => {
       try {
         const content = e.target?.result as string;
-        const result = importFromCSV(content, families);
+        const result = importFromCSV(content);
 
         if (
           window.confirm("This will replace all current data. Are you sure?")

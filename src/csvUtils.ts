@@ -8,216 +8,30 @@ const convertToCAD = (amount: number, currency: "USD" | "CAD") => {
   return amount;
 };
 
-// Export data to CSV format compatible with Google Sheets
-export const exportToCSV = (families: Family[], activities: Activity[]) => {
-  // Create CSV content
-  let csvContent = "data:text/csv;charset=utf-8,";
+// Parse CSV line properly handling quoted values with commas
+const parseCSVLine = (line: string): string[] => {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
 
-  // Add headers
-  const headers = [
-    "Activity",
-    "Date",
-    "Cost",
-    "Currency",
-    "Paid By",
-    ...families.map((f) => f.name),
-  ];
-  csvContent += headers.join(",") + "\n";
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
 
-  // Add activities
-  activities.forEach((activity) => {
-    const paidByFamily = families.find((f) => f.id === activity.paidBy);
-    const row = [
-      activity.name,
-      new Date(activity.date).toLocaleDateString(),
-      activity.cost.toString(),
-      activity.currency,
-      paidByFamily?.name || "",
-      ...families.map((family) => {
-        const participant = activity.participants.find(
-          (p) => p.familyId === family.id
-        );
-        return participant ? participant.count.toString() : "0";
-      }),
-    ];
-    csvContent += row.join(",") + "\n";
-  });
-
-  // Add balance rows
-  const results = calculateResults(families, activities);
-  results.forEach((result) => {
-    const balanceRow = [
-      `Balance - ${result.familyName}`,
-      "",
-      result.netAmount.toFixed(2),
-      "CAD",
-      "",
-      ...families.map((family) => (family.id === result.familyId ? "1" : "0")),
-    ];
-    csvContent += balanceRow.join(",") + "\n";
-  });
-
-  // Create download link
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "trip_expenses.csv");
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
-// Import data from CSV
-export const importFromCSV = (
-  csvText: string,
-  families: Family[]
-): { families: Family[]; activities: Activity[] } => {
-  const lines = csvText.split("\n").filter((line) => line.trim());
-  if (lines.length < 2) {
-    throw new Error(
-      "CSV file must have at least a header row and one data row"
-    );
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      result.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
   }
 
-  const headerLine = lines[0];
-  const dataLines = lines.slice(1);
+  // Add the last field
+  result.push(current.trim());
 
-  // Parse header to find family columns
-  const headers = headerLine.split(",").map((h) => h.trim());
-  console.log("CSV Headers:", headers);
-
-  // Find family columns (skip Activity, Date, Cost, Currency, Paid By)
-  const familyColumns = headers.slice(5); // Start from index 5
-  console.log("Family columns found:", familyColumns);
-
-  // Create new families from CSV if they don't exist
-  const newFamilies = [...families];
-  familyColumns.forEach((familyName) => {
-    if (familyName && !newFamilies.find((f) => f.name === familyName)) {
-      console.log("Adding new family from CSV:", familyName);
-      newFamilies.push({
-        id: `family-${Date.now()}-${Math.random()}`,
-        name: familyName,
-      });
-    }
-  });
-
-  // Parse activities
-  const newActivities: Activity[] = [];
-
-  dataLines.forEach((line, index) => {
-    const values = line.split(",").map((v) => v.trim());
-    console.log(`Processing line ${index + 1}:`, values);
-
-    // Skip balance rows
-    if (values[0] && values[0].toLowerCase().includes("balance")) {
-      console.log(`Skipping balance row: ${values[0]}`);
-      return;
-    }
-
-    // Skip empty rows
-    if (!values[0] || values[0] === "") {
-      console.log(`Skipping empty row`);
-      return;
-    }
-
-    // Validate we have enough columns
-    if (values.length < 5) {
-      console.log(`Skipping row with insufficient columns: ${values.length}`);
-      return;
-    }
-
-    const activityName = values[0];
-    const dateStr = values[1];
-    const costStr = values[2];
-    const currency = (values[3] as "USD" | "CAD") || "CAD";
-    const paidByName = values[4];
-
-    // Parse date
-    let activityDate: string;
-    try {
-      if (dateStr) {
-        const parsedDate = new Date(dateStr);
-        if (isNaN(parsedDate.getTime())) {
-          throw new Error("Invalid date");
-        }
-        activityDate = parsedDate.toISOString();
-      } else {
-        activityDate = new Date().toISOString();
-      }
-    } catch (error) {
-      console.log(
-        `Invalid date format for activity "${activityName}", using current date`
-      );
-      activityDate = new Date().toISOString();
-    }
-
-    // Parse cost
-    const cost = parseFloat(costStr);
-    if (isNaN(cost) || cost < 0) {
-      console.log(`Invalid cost for activity "${activityName}": ${costStr}`);
-      return;
-    }
-
-    // Find or create paying family
-    let paidByFamily = newFamilies.find((f) => f.name === paidByName);
-    if (!paidByFamily && paidByName) {
-      console.log(`Creating new family for payer: ${paidByName}`);
-      paidByFamily = {
-        id: `family-${Date.now()}-${Math.random()}`,
-        name: paidByName,
-      };
-      newFamilies.push(paidByFamily);
-    }
-
-    if (!paidByFamily) {
-      console.log(`No valid payer found for activity "${activityName}"`);
-      return;
-    }
-
-    // Parse participants
-    const participants: { familyId: string; count: number }[] = [];
-    const participantValues = values.slice(5); // Start from index 5 for participant counts
-
-    participantValues.forEach((countStr, participantIndex) => {
-      const familyName = familyColumns[participantIndex];
-      if (!familyName) return;
-
-      const count = parseInt(countStr);
-      if (!isNaN(count) && count > 0) {
-        const family = newFamilies.find((f) => f.name === familyName);
-        if (family) {
-          participants.push({
-            familyId: family.id,
-            count: count,
-          });
-        }
-      }
-    });
-
-    // Validate we have participants
-    if (participants.length === 0) {
-      console.log(`No valid participants found for activity "${activityName}"`);
-      return;
-    }
-
-    // Create activity
-    const activity: Activity = {
-      id: `activity-${Date.now()}-${Math.random()}`,
-      name: activityName,
-      date: activityDate,
-      cost: cost,
-      currency: currency,
-      paidBy: paidByFamily.id,
-      participants: participants,
-    };
-
-    console.log(`Successfully imported activity: ${activityName}`);
-    newActivities.push(activity);
-  });
-
-  console.log(`Import complete: ${newActivities.length} activities imported`);
-  return { families: newFamilies, activities: newActivities };
+  // Remove quotes from all values
+  return result.map((value) => value.replace(/^"|"$/g, ""));
 };
 
 // Calculate results for CSV export
@@ -266,4 +80,262 @@ const calculateResults = (families: Family[], activities: Activity[]) => {
   });
 
   return results;
+};
+
+// Export JSON data to CSV format
+export const exportToCSV = (families: Family[], activities: Activity[]) => {
+  if (families.length === 0 || activities.length === 0) {
+    throw new Error("No data to export. Add families and activities first.");
+  }
+
+  // Calculate results for balance row
+  const results = calculateResults(families, activities);
+
+  // Create CSV content
+  let csvContent = "data:text/csv;charset=utf-8,";
+
+  // Add balance row
+  const balanceRow = ["Balance:"];
+  families.forEach(() => balanceRow.push("")); // Empty cells for Date, Description, Currency, Amount, Paid By
+  families.forEach((family) => {
+    const result = results.find((r) => r.familyId === family.id);
+    if (result) {
+      const sign = result.netAmount >= 0 ? "" : "-";
+      const amount = Math.abs(result.netAmount).toFixed(2);
+      balanceRow.push(family.name, `${sign}$${amount}`);
+    } else {
+      balanceRow.push(family.name, "$0.00");
+    }
+  });
+  balanceRow.push("", "", "", "Instructions:");
+  csvContent += balanceRow.join(",") + "\n";
+
+  // Add main headers
+  const headers = ["Date", "Description", "Currency", "Amount", "Paid By"];
+  families.forEach((family) => {
+    headers.push(family.name, ""); // Name and empty cell for share
+  });
+  headers.push("Amount in CAD", "Total Beneficiaries", "", "");
+  csvContent += headers.join(",") + "\n";
+
+  // Add sub-headers
+  const subHeaders = ["", "", "", "", ""];
+  families.forEach(() => {
+    subHeaders.push("People", "Share");
+  });
+  subHeaders.push("", "", "", "");
+  csvContent += subHeaders.join(",") + "\n";
+
+  // Add activities
+  activities.forEach((activity) => {
+    const paidByFamily = families.find((f) => f.id === activity.paidBy);
+    const totalParticipants = activity.participants.reduce(
+      (sum, p) => sum + p.count,
+      0
+    );
+    const amountInCAD = convertToCAD(activity.cost, activity.currency);
+
+    const row = [
+      new Date(activity.date).toISOString().split("T")[0], // Format as YYYY-MM-DD
+      activity.name,
+      activity.currency,
+      activity.cost.toFixed(2),
+      paidByFamily?.name || "",
+    ];
+
+    // Add participant data for each family
+    families.forEach((family) => {
+      const participant = activity.participants.find(
+        (p) => p.familyId === family.id
+      );
+      const count = participant ? participant.count : 0;
+      const share =
+        totalParticipants > 0 ? (amountInCAD * count) / totalParticipants : 0;
+
+      row.push(count.toString(), share.toFixed(2));
+    });
+
+    row.push(amountInCAD.toFixed(2), totalParticipants.toString(), "", "");
+    csvContent += row.join(",") + "\n";
+  });
+
+  // Create download link
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "trip_expenses.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+// Import CSV data to JSON format
+export const importFromCSV = (
+  csvText: string
+): { families: Family[]; activities: Activity[] } => {
+  const lines = csvText.split("\n").filter((line) => line.trim());
+  if (lines.length < 3) {
+    throw new Error(
+      "CSV file must have at least balance row, header row, and sub-header row"
+    );
+  }
+
+  // Skip the balance row (row 0) and get headers (row 1) and sub-headers (row 2)
+  const headerLine = lines[1];
+  const subHeaderLine = lines[2];
+  const dataLines = lines.slice(3);
+
+  // Parse headers to find family names
+  const headers = parseCSVLine(headerLine);
+  const subHeaders = parseCSVLine(subHeaderLine);
+
+  console.log("CSV Headers:", headers);
+  console.log("CSV Sub-headers:", subHeaders);
+
+  // Extract family names from headers (skip Date, Description, Currency, Amount, Paid By)
+  const familyNames: string[] = [];
+  for (let i = 5; i < headers.length - 3; i += 2) {
+    // Skip Amount in CAD, Total Beneficiaries, and empty columns
+    const familyName = headers[i];
+    if (familyName && familyName.trim() !== "") {
+      familyNames.push(familyName.trim());
+    }
+  }
+
+  console.log("Family names found:", familyNames);
+
+  if (familyNames.length === 0) {
+    throw new Error("No family names found in CSV headers");
+  }
+
+  // Create families
+  const families: Family[] = familyNames.map((name, index) => ({
+    id: `family-${Date.now()}-${index}`,
+    name: name,
+  }));
+
+  // Parse activities
+  const activities: Activity[] = [];
+
+  dataLines.forEach((line, index) => {
+    // Proper CSV parsing that handles quoted values with commas
+    const values = parseCSVLine(line);
+    console.log(`Processing line ${index + 1}:`, values);
+
+    // Skip empty rows or rows with insufficient data
+    if (values.length < 5 || !values[0] || values[0] === "") {
+      console.log(`Skipping empty or invalid row`);
+      return;
+    }
+
+    const dateStr = values[0];
+    const description = values[1];
+    const currency = (values[2] as "USD" | "CAD") || "CAD";
+    const costStr = values[3];
+    const paidByName = values[4];
+
+    console.log(
+      `Parsing activity: "${description}" - Cost: "${costStr}" - Currency: "${currency}"`
+    );
+
+    // Skip if missing essential data
+    if (!description || !costStr || !paidByName) {
+      console.log(`Skipping row with missing essential data`);
+      return;
+    }
+
+    // Parse date
+    let activityDate: string;
+    try {
+      if (dateStr) {
+        const parsedDate = new Date(dateStr);
+        if (isNaN(parsedDate.getTime())) {
+          throw new Error("Invalid date");
+        }
+        activityDate = parsedDate.toISOString();
+      } else {
+        activityDate = new Date().toISOString();
+      }
+    } catch (error) {
+      console.log(
+        `Invalid date format for activity "${description}", using current date`
+      );
+      activityDate = new Date().toISOString();
+    }
+
+    // Parse cost - handle commas and dollar signs
+    const cleanCostStr = costStr.replace(/[$,]/g, "");
+    const cost = parseFloat(cleanCostStr);
+    if (isNaN(cost) || cost < 0) {
+      console.log(
+        `Invalid cost for activity "${description}": ${costStr} (cleaned: ${cleanCostStr})`
+      );
+      return;
+    }
+
+    // Find or create paying family
+    let paidByFamily = families.find((f) => f.name === paidByName);
+    if (!paidByFamily && paidByName) {
+      console.log(`Creating new family for payer: ${paidByName}`);
+      paidByFamily = {
+        id: `family-${Date.now()}-${Math.random()}`,
+        name: paidByName,
+      };
+      families.push(paidByFamily);
+    }
+
+    if (!paidByFamily) {
+      console.log(`No valid payer found for activity "${description}"`);
+      return;
+    }
+
+    // Parse participants from the family columns
+    const participants: { familyId: string; count: number }[] = [];
+
+    // Start from index 5 (after Date, Description, Currency, Amount, Paid By)
+    // Each family has 2 columns: People, Share
+    for (let i = 0; i < familyNames.length; i++) {
+      const peopleIndex = 5 + i * 2; // People column for this family
+
+      if (peopleIndex < values.length) {
+        const countStr = values[peopleIndex];
+        const count = parseInt(countStr);
+
+        if (!isNaN(count) && count > 0) {
+          const family = families.find((f) => f.name === familyNames[i]);
+          if (family) {
+            participants.push({
+              familyId: family.id,
+              count: count,
+            });
+          }
+        }
+      }
+    }
+
+    // Validate we have participants
+    if (participants.length === 0) {
+      console.log(`No valid participants found for activity "${description}"`);
+      return;
+    }
+
+    // Create activity
+    const activity: Activity = {
+      id: `activity-${Date.now()}-${Math.random()}`,
+      name: description,
+      date: activityDate,
+      cost: cost,
+      currency: currency,
+      paidBy: paidByFamily.id,
+      participants: participants,
+    };
+
+    console.log(`Successfully imported activity: ${description}`);
+    activities.push(activity);
+  });
+
+  console.log(
+    `Import complete: ${families.length} families and ${activities.length} activities imported`
+  );
+  return { families, activities };
 };
