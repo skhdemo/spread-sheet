@@ -192,6 +192,13 @@ body {
   font-weight: 500;
 }
 
+.activities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
 .activity-card {
   background: white;
   border: 2px solid #e2e8f0;
@@ -290,6 +297,10 @@ body {
 
 @media (max-width: 768px) {
   .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .activities-grid {
     grid-template-columns: 1fr;
   }
 

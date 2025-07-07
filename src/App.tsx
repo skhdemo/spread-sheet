@@ -690,222 +690,239 @@ function App() {
             <Plus size={16} />
             Add Activity
           </button>
+        </div>
+      </div>
 
-          {activities.map((activity) => {
-            const totalParticipants = activity.participants.reduce(
-              (sum, p) => sum + p.count,
-              0
-            );
-            return (
-              <div key={activity.id} className="activity-card">
-                {editingActivityId === activity.id ? (
-                  // Edit mode
-                  <div>
-                    <div className="form-group">
-                      <label>Activity Name:</label>
-                      <input
-                        type="text"
-                        value={editingActivityName}
-                        onChange={(e) => setEditingActivityName(e.target.value)}
-                        placeholder="e.g., Dinner at Restaurant"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Cost:</label>
+      {/* Activities Display Section */}
+      {activities.length > 0 && (
+        <div className="section">
+          <h2>
+            <DollarSign size={24} />
+            All Activities ({activities.length})
+          </h2>
+          <div className="activities-grid">
+            {activities.map((activity) => {
+              const totalParticipants = activity.participants.reduce(
+                (sum, p) => sum + p.count,
+                0
+              );
+              return (
+                <div key={activity.id} className="activity-card">
+                  {editingActivityId === activity.id ? (
+                    // Edit mode
+                    <div>
+                      <div className="form-group">
+                        <label>Activity Name:</label>
+                        <input
+                          type="text"
+                          value={editingActivityName}
+                          onChange={(e) =>
+                            setEditingActivityName(e.target.value)
+                          }
+                          placeholder="e.g., Dinner at Restaurant"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Cost:</label>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "0.5rem",
+                            alignItems: "center",
+                          }}
+                        >
+                          <input
+                            type="number"
+                            value={editingActivityCost}
+                            onChange={(e) =>
+                              setEditingActivityCost(e.target.value)
+                            }
+                            placeholder="0.00"
+                            step="0.01"
+                            min="0"
+                            style={{ flex: 1 }}
+                          />
+                          <select
+                            value={editingActivityCurrency}
+                            onChange={(e) =>
+                              setEditingActivityCurrency(
+                                e.target.value as "USD" | "CAD"
+                              )
+                            }
+                            style={{ width: "auto" }}
+                          >
+                            <option value="CAD">CAD</option>
+                            <option value="USD">USD</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label>Paid By:</label>
+                        <select
+                          value={editingActivityPaidBy}
+                          onChange={(e) =>
+                            setEditingActivityPaidBy(e.target.value)
+                          }
+                        >
+                          <option value="">Select a family</option>
+                          {families.map((family) => (
+                            <option key={family.id} value={family.id}>
+                              {family.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Date:</label>
+                        <input
+                          type="date"
+                          value={editingActivityDate}
+                          onChange={(e) =>
+                            setEditingActivityDate(e.target.value)
+                          }
+                          placeholder="Select date"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Number of Participants Per Family:</label>
+                        {families.length === 0 && (
+                          <div
+                            style={{ color: "#718096", fontSize: "0.95rem" }}
+                          >
+                            Add families first.
+                          </div>
+                        )}
+                        {families.map((family) => {
+                          const value =
+                            editingActivityParticipants.find(
+                              (p) => p.familyId === family.id
+                            )?.count || "";
+                          return (
+                            <div
+                              key={family.id}
+                              style={{
+                                marginBottom: "0.5rem",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.5rem",
+                              }}
+                            >
+                              <label style={{ minWidth: 120 }}>
+                                {family.name}:
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                value={value}
+                                onChange={(e) =>
+                                  handleEditParticipantCountChange(
+                                    family.id,
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="0"
+                                style={{ width: 80 }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
                       <div
                         style={{
                           display: "flex",
                           gap: "0.5rem",
-                          alignItems: "center",
+                          marginTop: "0.5rem",
                         }}
                       >
-                        <input
-                          type="number"
-                          value={editingActivityCost}
-                          onChange={(e) =>
-                            setEditingActivityCost(e.target.value)
-                          }
-                          placeholder="0.00"
-                          step="0.01"
-                          min="0"
-                          style={{ flex: 1 }}
-                        />
-                        <select
-                          value={editingActivityCurrency}
-                          onChange={(e) =>
-                            setEditingActivityCurrency(
-                              e.target.value as "USD" | "CAD"
-                            )
-                          }
-                          style={{ width: "auto" }}
+                        <button
+                          className="btn btn-primary btn-small"
+                          onClick={saveEditActivity}
                         >
-                          <option value="CAD">CAD</option>
-                          <option value="USD">USD</option>
-                        </select>
+                          <Save size={14} /> Save
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-small"
+                          onClick={cancelEditActivity}
+                        >
+                          <X size={14} /> Cancel
+                        </button>
                       </div>
                     </div>
-                    <div className="form-group">
-                      <label>Paid By:</label>
-                      <select
-                        value={editingActivityPaidBy}
-                        onChange={(e) =>
-                          setEditingActivityPaidBy(e.target.value)
-                        }
-                      >
-                        <option value="">Select a family</option>
-                        {families.map((family) => (
-                          <option key={family.id} value={family.id}>
-                            {family.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="form-group">
-                      <label>Date:</label>
-                      <input
-                        type="date"
-                        value={editingActivityDate}
-                        onChange={(e) => setEditingActivityDate(e.target.value)}
-                        placeholder="Select date"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Number of Participants Per Family:</label>
-                      {families.length === 0 && (
-                        <div style={{ color: "#718096", fontSize: "0.95rem" }}>
-                          Add families first.
+                  ) : (
+                    // View mode
+                    <>
+                      <div className="activity-header">
+                        <div className="activity-name">{activity.name}</div>
+                        <div className="activity-cost">
+                          {activity.currency === "USD" ? "$" : "C$"}
+                          {activity.cost.toFixed(2)}
                         </div>
-                      )}
-                      {families.map((family) => {
-                        const value =
-                          editingActivityParticipants.find(
-                            (p) => p.familyId === family.id
-                          )?.count || "";
-                        return (
-                          <div
-                            key={family.id}
-                            style={{
-                              marginBottom: "0.5rem",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.5rem",
-                            }}
-                          >
-                            <label style={{ minWidth: 120 }}>
-                              {family.name}:
-                            </label>
-                            <input
-                              type="number"
-                              min={0}
-                              value={value}
-                              onChange={(e) =>
-                                handleEditParticipantCountChange(
-                                  family.id,
-                                  e.target.value
-                                )
-                              }
-                              placeholder="0"
-                              style={{ width: 80 }}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "0.5rem",
-                        marginTop: "0.5rem",
-                      }}
-                    >
-                      <button
-                        className="btn btn-primary btn-small"
-                        onClick={saveEditActivity}
-                      >
-                        <Save size={14} /> Save
-                      </button>
-                      <button
-                        className="btn btn-secondary btn-small"
-                        onClick={cancelEditActivity}
-                      >
-                        <X size={14} /> Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  // View mode
-                  <>
-                    <div className="activity-header">
-                      <div className="activity-name">{activity.name}</div>
-                      <div className="activity-cost">
-                        {activity.currency === "USD" ? "$" : "C$"}
-                        {activity.cost.toFixed(2)}
                       </div>
-                    </div>
-                    <div className="paid-by">
-                      Paid by:{" "}
-                      {families.find((f) => f.id === activity.paidBy)?.name}
-                    </div>
-                    <div
-                      className="activity-date"
-                      style={{
-                        fontSize: "0.875rem",
-                        color: "#718096",
-                        marginBottom: "0.5rem",
-                      }}
-                    >
-                      Date: {new Date(activity.date).toLocaleDateString()}
-                    </div>
-                    <div className="participants">
-                      {activity.participants.map((p) => {
-                        const fam = families.find((f) => f.id === p.familyId);
-                        if (!fam || p.count === 0) return null;
-                        return (
-                          <span key={p.familyId} className="participant">
-                            {fam.name}: {p.count}
-                          </span>
-                        );
-                      })}
-                      <span
-                        className="participant"
+                      <div className="paid-by">
+                        Paid by:{" "}
+                        {families.find((f) => f.id === activity.paidBy)?.name}
+                      </div>
+                      <div
+                        className="activity-date"
                         style={{
-                          background: "#c6f6d5",
-                          color: "#22543d",
-                          marginLeft: 8,
+                          fontSize: "0.875rem",
+                          color: "#718096",
+                          marginBottom: "0.5rem",
                         }}
                       >
-                        Total: {totalParticipants}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "0.25rem",
-                        marginTop: "0.5rem",
-                      }}
-                    >
-                      <button
-                        className="btn btn-secondary btn-small"
-                        onClick={() => startEditActivity(activity)}
+                        Date: {new Date(activity.date).toLocaleDateString()}
+                      </div>
+                      <div className="participants">
+                        {activity.participants.map((p) => {
+                          const fam = families.find((f) => f.id === p.familyId);
+                          if (!fam || p.count === 0) return null;
+                          return (
+                            <span key={p.familyId} className="participant">
+                              {fam.name}: {p.count}
+                            </span>
+                          );
+                        })}
+                        <span
+                          className="participant"
+                          style={{
+                            background: "#c6f6d5",
+                            color: "#22543d",
+                            marginLeft: 8,
+                          }}
+                        >
+                          Total: {totalParticipants}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "0.25rem",
+                          marginTop: "0.5rem",
+                        }}
                       >
-                        <Edit3 size={14} />
-                      </button>
-                      <button
-                        className="btn btn-danger btn-small"
-                        onClick={() => removeActivity(activity.id)}
-                      >
-                        <Trash2 size={14} />
-                        Remove
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })}
+                        <button
+                          className="btn btn-secondary btn-small"
+                          onClick={() => startEditActivity(activity)}
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                        <button
+                          className="btn btn-danger btn-small"
+                          onClick={() => removeActivity(activity.id)}
+                        >
+                          <Trash2 size={14} />
+                          Remove
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Results Section */}
       {results.length > 0 && (
